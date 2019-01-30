@@ -1,0 +1,58 @@
+services:
+  - docker
+language: java
+sudo: false
+install: true
+addons:
+  sonarcloud:
+    organization: "gssachdeva-github"
+    token:
+      secure: "$SONAR_TOKEN"
+jdk:
+- oraclejdk8
+install: "/bin/true"
+script:
+- export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
+- echo "TRAVIS_BRANCH=$TRAVIS_BRANCH, PR=$PR, BRANCH=$BRANCH"
+- if [ ! -z "${TRAVIS_TAG}" ]; then mvn versions:set -DnewVersion=${TRAVIS_TAG:1}; fi
+- mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent package sonar:sonar install -e
+cache:
+  directories:
+  - "$HOME/.m2"
+  - "$HOME/.sonar/cache"
+before_deploy:
+  - export WEBGOAT_SERVER_TARGET_DIR=$HOME/build/$TRAVIS_REPO_SLUG/webgoat-server/target
+  - export WEBWOLF_TARGET_DIR=$HOME/build/$TRAVIS_REPO_SLUG/webwolf/target
+  - export WEBGOAT_ARTIFACTS_FOLDER=$HOME/build/$TRAVIS_REPO_SLUG/Deployable_Artifacts/
+  - mkdir -p $WEBGOAT_ARTIFACTS_FOLDER
+  - cp -fa $WEBGOAT_SERVER_TARGET_DIR/*.jar $WEBGOAT_ARTIFACTS_FOLDER/
+  - cp -fa $WEBWOLF_TARGET_DIR/*.jar $WEBGOAT_ARTIFACTS_FOLDER/
+  - echo "Contents of artifacts folder:"
+  - ls $WEBGOAT_ARTIFACTS_FOLDER
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script: bash scripts/deploy-webgoat.sh
+    on:
+      repo: gssachdeva/WebGoat
+      tags: true
+after_deploy:
+  - docker pull gssachdeva/webgoat:latest
+  - docker run -p 8080:8080 gssachdeva/webgoat:latest  &
+  - docker ps -a
+  - docker pull owasp/zap2docker-stable
+  - docker run -t owasp/zap2docker-stable zap-baseline.py -t http://172.17.0.2:8080/WebGoat
+  - docker ps -a
+  - docker inspect 
+        $(docker ps |grep gssachdeva/webgoat 
+        | awk '{print $1}')
+        | grep IPAddress
+  - docker kill 
+        $(docker ps |grep gssachdeva/webgoat 
+        | awk '{print $1}')
+env:
+  global:
+  #Docker login
+  - secure: XgPc0UKRTUI70I4YWNQpThPPWeQIxkmzh1GNoR/SSDC2GPIBq3EfkkbSQewqil8stTy+S1/xSzc0JXG8NTn7UOxHVHA/2nhI6jX9E+DKtXQ89YwmaDNQjkbMjziAtDCIex+5TRykxNfkxj6VPYbDssrzI7iJXOIZVj/HoyO3O5E=
+  #Docker password
+  - secure: aly5TKBUK9sIiqtMbytNNPZHQhC0a7Yond5tEtuJ8fO+j/KZB4Uro3I6BhzYjGWFb5Kndd0j2TXHPFvtOl402J1CmFsY3v0BhilQd0g6zOssp5T0A73m8Jgq4ItV8wQJJy2bQsXqL1B+uFYieYPiMchj7JxWW0vBn7TV5b68l6U=
