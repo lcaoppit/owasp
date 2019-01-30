@@ -7,7 +7,7 @@ services:
       - WEBWOLF_HOST=webwolf
       - WEBWOLF_PORT=9090
     ports:
-      - "8080:8080"
+      - "8081:8081"
       - "9001:9001"
     volumes:
       - .:/home/webgoat/.webgoat
@@ -15,4 +15,4 @@ services:
     image: webgoat/webwolf
     ports:
       - "9090:9090"
-    command: --spring.datasource.url=jdbc:hsqldb:hsql://webgoat:9001/webgoat --server.address=0.0.0.0
+    command: --spring.datasource.url=jdbc:hsqldb:hsql://webgoat:9001/webgoat
